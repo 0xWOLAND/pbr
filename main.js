@@ -24,18 +24,50 @@ function main() {
     uniform vec4      iMouse;
     precision highp float;
 
-    #define depth 1.0
+    #define depth -1.0
+    // ########################### STRUCTS #############################
+
     
     struct Ray {
       vec3 pos;
       vec3 dir;
     };
+
+    // ########################## HELPERS     ##########################
+
+    vec3 at(Ray r, float t) {
+      return r.pos + r.dir * t;
+    }
+
+    float hit_sphere(vec3 center, float radius, Ray r) {
+      vec3 oc = r.pos - center;
+      float a = dot(r.dir, r.dir);
+      float b = 2.0 * dot(oc, r.dir);
+      float c = dot(oc, oc) - radius * radius;
+      float disc = b * b - 4.0 * a * c;
+
+      if (disc < 0.0) {
+        return -1.0;
+      } else {
+          return (-b - sqrt(disc) ) / (2.0*a);
+          // return 1.0;
+      }
+    }
+
+    // ########################## MAIN        ##########################
     
     vec3 ray_color(Ray r){
+      float t = hit_sphere(vec3(0.0,0.0,-1.0), 0.5, r);
+      if (t >= 0.0) {
+          vec3 N = normalize(at(r, t) - vec3(0.0,0.0,-1.0));
+          return 0.5 * vec3(N.x + 1.0, N.y + 1.0, N.z + 1.0);
+      }
+
       vec3 dir = r.dir;
-      float t = 0.5 * (dir.y + 1.0);
+      t = 0.5 * (dir.y + 1.0);
       return (1.0 - t) * vec3(1.0) + t * vec3(0.5, 0.7, 1.0);
     }
+
     
     void main() {
       vec2 coord = gl_FragCoord.xy / iResolution.xy;

@@ -4,7 +4,7 @@
   "description": "https://user-images.githubusercontent.com/41707552/189504375-d9da4443-3029-4af9-ad00-42d921296f94.mp4",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "http-server"
   },
   "type": "module",
   "author": "",
