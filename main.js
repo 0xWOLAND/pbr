@@ -25,6 +25,11 @@ function main() {
     precision highp float;
 
     #define depth -1.0
+    #define MAXSTEPS 35
+    #define z_near 0.00125
+    #define R 1.0
+    #define Iterations 32 
+    #define Scale 2.0
     // ########################### STRUCTS #############################
 
     
@@ -33,13 +38,27 @@ function main() {
       vec3 dir;
     };
 
+    struct Sphere {
+      vec3 cen;
+      float r;
+    };
+
+    struct Hittable {
+      float t;
+      vec3 p;
+      vec3 normal;
+    };
+
     // ########################## HELPERS     ##########################
 
     vec3 at(Ray r, float t) {
       return r.pos + r.dir * t;
     }
 
-    float hit_sphere(vec3 center, float radius, Ray r) {
+    bool hit_sphere(Sphere s, Ray r, float t_min, float t_max, inout Hittable h) {
+      float radius = s.r;
+      vec3 center = s.cen;
+
       vec3 oc = r.pos - center;
       float a = dot(r.dir, r.dir);
       float b = 2.0 * dot(oc, r.dir);
@@ -47,25 +66,60 @@ function main() {
       float disc = b * b - 4.0 * a * c;
 
       if (disc < 0.0) {
-        return -1.0;
-      } else {
-          return (-b - sqrt(disc) ) / (2.0*a);
-          // return 1.0;
+        return false;
       }
+      float root1 = (-b - sqrt(disc) ) / (2.0*a);
+      float root2 = (-b + sqrt(disc) ) / (2.0*a);
+
+      if (t_min <= root1 && root1 <= t_max) {
+        h.t = root1;
+        h.p = at(r, root1);
+        h.normal = (h.p - center) / radius;
+        return true;
+      }
+      else if (t_min <= root2 && root2 <= t_max) {
+        h.t = root2;
+        h.p = at(r, root2);
+        h.normal = (h.p - center) / radius;
+        return true;
+      }
+      
+      return false;
     }
 
     // ########################## MAIN        ##########################
-    
-    vec3 ray_color(Ray r){
-      float t = hit_sphere(vec3(0.0,0.0,-1.0), 0.5, r);
-      if (t >= 0.0) {
-          vec3 N = normalize(at(r, t) - vec3(0.0,0.0,-1.0));
-          return 0.5 * vec3(N.x + 1.0, N.y + 1.0, N.z + 1.0);
+
+    float DE(vec3 z) {
+      vec3 a1 = vec3(1,1,1);
+      vec3 a2 = vec3(-1,-1,1);
+      vec3 a3 = vec3(1,-1,-1);
+      vec3 a4 = vec3(-1,1,-1);
+      vec3 c;
+      int n = 0;
+      float dist, d;
+      for(int i = 0; i < Iterations; i++) {
+        c = a1; dist = length(z-a1);
+              d = length(z-a2); if (d < dist) { c = a2; dist=d; }
+        d = length(z-a3); if (d < dist) { c = a3; dist=d; }
+        d = length(z-a4); if (d < dist) { c = a4; dist=d; }
+        z = Scale*z-c*(Scale-1.0);
+        n++;
       }
 
-      vec3 dir = r.dir;
-      t = 0.5 * (dir.y + 1.0);
-      return (1.0 - t) * vec3(1.0) + t * vec3(0.5, 0.7, 1.0);
+      return length(z) * pow(Scale, float(-n));
+    }
+    
+    vec3 ray_color(Ray r){
+      float totalDistance = 0.0;
+      int count = 0;
+      for (int steps=0; steps < MAXSTEPS; steps++) {
+        vec3 p = r.pos + totalDistance * r.dir;
+        float distance = DE(p);
+        totalDistance += distance;
+        if (distance < z_near) break;
+        count++;
+      }
+      return vec3(1.0 - float(count)/float(MAXSTEPS));
     }
 
     
