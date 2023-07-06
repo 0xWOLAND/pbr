@@ -4,6 +4,9 @@ const canvas = document.querySelector("#canvas");
 const gl = canvas.getContext("webgl");
 var datInput = {
   renderSmoothen: 1000,
+  depth: -1.0,
+  Scale: 2.0,
+  Offset: 0.0,
 };
 var gui;
 function main() {
@@ -21,15 +24,15 @@ function main() {
     precision highp float;
     uniform vec3      iResolution;
     uniform float     iTime;
+    uniform float     depth;
+    uniform float     Scale;
+    uniform float     Offset;
     uniform vec4      iMouse;
     precision highp float;
 
-    #define depth -1.0
-    #define MAXSTEPS 35
-    #define z_near 0.00125
-    #define R 1.0
-    #define Iterations 32 
-    #define Scale 2.0
+    #define MAXSTEPS 25
+    #define z_near 10e-6
+    #define Iterations 30 
     // ########################### STRUCTS #############################
 
     
@@ -38,75 +41,18 @@ function main() {
       vec3 dir;
     };
 
-    struct Sphere {
-      vec3 cen;
-      float r;
-    };
-
-    struct Hittable {
-      float t;
-      vec3 p;
-      vec3 normal;
-    };
-
-    // ########################## HELPERS     ##########################
-
-    vec3 at(Ray r, float t) {
-      return r.pos + r.dir * t;
-    }
-
-    bool hit_sphere(Sphere s, Ray r, float t_min, float t_max, inout Hittable h) {
-      float radius = s.r;
-      vec3 center = s.cen;
-
-      vec3 oc = r.pos - center;
-      float a = dot(r.dir, r.dir);
-      float b = 2.0 * dot(oc, r.dir);
-      float c = dot(oc, oc) - radius * radius;
-      float disc = b * b - 4.0 * a * c;
-
-      if (disc < 0.0) {
-        return false;
-      }
-      float root1 = (-b - sqrt(disc) ) / (2.0*a);
-      float root2 = (-b + sqrt(disc) ) / (2.0*a);
-
-      if (t_min <= root1 && root1 <= t_max) {
-        h.t = root1;
-        h.p = at(r, root1);
-        h.normal = (h.p - center) / radius;
-        return true;
-      }
-      else if (t_min <= root2 && root2 <= t_max) {
-        h.t = root2;
-        h.p = at(r, root2);
-        h.normal = (h.p - center) / radius;
-        return true;
-      }
-      
-      return false;
-    }
-
     // ########################## MAIN        ##########################
 
     float DE(vec3 z) {
-      vec3 a1 = vec3(1,1,1);
-      vec3 a2 = vec3(-1,-1,1);
-      vec3 a3 = vec3(1,-1,-1);
-      vec3 a4 = vec3(-1,1,-1);
-      vec3 c;
       int n = 0;
-      float dist, d;
-      for(int i = 0; i < Iterations; i++) {
-        c = a1; dist = length(z-a1);
-              d = length(z-a2); if (d < dist) { c = a2; dist=d; }
-        d = length(z-a3); if (d < dist) { c = a3; dist=d; }
-        d = length(z-a4); if (d < dist) { c = a4; dist=d; }
-        z = Scale*z-c*(Scale-1.0);
+      for (int i = 0; i < Iterations; i++) {
+        if(z.x+z.y<0.0) z.xy = -z.yx; // fold 1
+        if(z.x+z.z<0.0) z.xz = -z.zx; // fold 2
+        if(z.y+z.z<0.0) z.zy = -z.yz; // fold 3	
+        z = z*Scale - Offset*(Scale-1.0);
         n++;
       }
-
-      return length(z) * pow(Scale, float(-n));
+      return (length(z) ) * pow(Scale, -float(n));
     }
     
     vec3 ray_color(Ray r){
@@ -151,6 +97,9 @@ function main() {
   gl.useProgram(program);
   var resolution = gl.getUniformLocation(program, "iResolution");
   var time = gl.getUniformLocation(program, "iTime");
+  var depth = gl.getUniformLocation(program, "depth");
+  var scale = gl.getUniformLocation(program, "Scale");
+  var offset = gl.getUniformLocation(program, "Offset");
   var mouse = gl.getUniformLocation(program, "iMouse");
   function render(deltaMS) {
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -158,6 +107,9 @@ function main() {
     gl.uniform3fv(resolution, [gl.canvas.width, gl.canvas.height, 0]);
     deltaMS /= datInput.renderSmoothen;
     gl.uniform1f(time, deltaMS);
+    gl.uniform1f(depth, datInput.depth);
+    gl.uniform1f(scale, datInput.Scale);
+    gl.uniform1f(offset, datInput.Offset);
     gl.uniform4fv(mouse, [mousepos[0], mousepos[1], 0, 0]);
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -175,4 +127,7 @@ function initializeGUI() {
   var g = new dat.GUI({ name: "Controls" });
   var inputFolder = g.addFolder("Input");
   inputFolder.add(datInput, "renderSmoothen", 1, 1000);
+  inputFolder.add(datInput, "depth", -10, 0);
+  inputFolder.add(datInput, "Scale", 0, 5);
+  inputFolder.add(datInput, "Offset", 0, 5);
 }
