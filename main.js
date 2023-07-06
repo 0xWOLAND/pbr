@@ -6,7 +6,8 @@ var datInput = {
   renderSmoothen: 1000,
   depth: -1.0,
   Scale: 2.0,
-  Offset: 0.0,
+  Power: 1.0,
+  Offset: 1.0,
 };
 var gui;
 function main() {
@@ -26,6 +27,7 @@ function main() {
     uniform float     iTime;
     uniform float     depth;
     uniform float     Scale;
+    uniform float     Power;
     uniform float     Offset;
     uniform vec4      iMouse;
     precision highp float;
@@ -76,9 +78,10 @@ function main() {
       vec2 uv = 2.0 * coord - 1.0;
       uv.x *= aspect_ratio;
       
-      vec3 origin = vec3(0.0);
+      vec3 target = vec3(0.0);
+      vec3 origin = vec3(1.0, 1.0, 4.0);
 
-      Ray r = Ray(origin, vec3(uv, depth) - origin);
+      Ray r = Ray(origin, normalize(vec3(uv, depth)) - target);
       gl_FragColor = vec4(ray_color(r), 1.0);
     }
   `;
@@ -99,6 +102,7 @@ function main() {
   var time = gl.getUniformLocation(program, "iTime");
   var depth = gl.getUniformLocation(program, "depth");
   var scale = gl.getUniformLocation(program, "Scale");
+  var power = gl.getUniformLocation(program, "Power");
   var offset = gl.getUniformLocation(program, "Offset");
   var mouse = gl.getUniformLocation(program, "iMouse");
   function render(deltaMS) {
@@ -109,6 +113,7 @@ function main() {
     gl.uniform1f(time, deltaMS);
     gl.uniform1f(depth, datInput.depth);
     gl.uniform1f(scale, datInput.Scale);
+    gl.uniform1f(power, datInput.Power);
     gl.uniform1f(offset, datInput.Offset);
     gl.uniform4fv(mouse, [mousepos[0], mousepos[1], 0, 0]);
     gl.enableVertexAttribArray(positionAttributeLocation);
@@ -129,5 +134,6 @@ function initializeGUI() {
   inputFolder.add(datInput, "renderSmoothen", 1, 1000);
   inputFolder.add(datInput, "depth", -10, 0);
   inputFolder.add(datInput, "Scale", 0, 5);
+  inputFolder.add(datInput, "Power", 0, 5);
   inputFolder.add(datInput, "Offset", 0, 5);
 }
