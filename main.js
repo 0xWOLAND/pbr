@@ -34,9 +34,10 @@ function main() {
     uniform vec4      iMouse;
     precision highp float;
 
-    #define MAXSTEPS 15
-    #define z_near 10e-3
-    #define Iterations 10 
+    #define MAXSTEPS 35
+    #define z_near 10e-6
+    #define z_far 3.5
+    #define Iterations 20 
     // ########################### STRUCTS #############################
 
     
@@ -47,23 +48,29 @@ function main() {
 
     // ########################## MAIN        ##########################
 
-    float DE(vec3 z) {
-      vec3 a1 = vec3(-1.0, 0, 0);
-      vec3 a2 = vec3( 1.0, 0, 0);
-      vec3 a3 = vec3( 0, 2.0, 0);
-      vec3 a4 = vec3(0, sqrt(2.0) / 2.0, 2.0);
-      vec3 c;
-      int n = 0;
-      float dist, d;
-      for(int i = 0; i < Iterations; i++) {
-        c = a1; dist = length(z-a1);
-              d = length(z-a2); if (d < dist) { c = a2; dist=d; }
-        d = length(z-a3); if (d < dist) { c = a3; dist=d; }
-        d = length(z-a4); if (d < dist) { c = a4; dist=d; }
-        z = Scale*z-c*(Scale-1.0);
-        n++;
-      }
-      return length(z) * pow(Scale, float(-n));
+    float DE(vec3 pos) {
+vec3 z = pos;
+	float dr = 1.0;
+	float r = 0.0;
+	for (int i = 0; i < Iterations ; i++) {
+		r = length(z);
+		if (r>z_far) break;
+		
+		// convert to polar coordinates
+		float theta = acos(z.z/r);
+		float phi = atan(z.y,z.x);
+		dr =  pow( r, Power-1.0)*Power*dr + 1.0;
+		
+		// scale and rotate the point
+		float zr = pow( r,Power);
+		theta = theta*Power;
+		phi = phi*Power;
+		
+		// convert back to cartesian coordinates
+		z = zr*vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta));
+		z+=pos;
+	}
+	return 0.5*log(r)*r/dr;
     }
     
     vec3 ray_color(Ray r){
@@ -148,7 +155,7 @@ function initializeGUI() {
   inputFolder.add(datInput, "renderSmoothen", 1, 1000);
   inputFolder.add(datInput, "depth", 0, 5);
   inputFolder.add(datInput, "Scale", 0, 5);
-  inputFolder.add(datInput, "Power", 0, 5);
+  inputFolder.add(datInput, "Power", 0, 15);
   inputFolder.add(datInput, "Offset", 0, 5);
   inputFolder.add(datInput, "Rotation", 0, 2.0 * Math.PI);
 }
