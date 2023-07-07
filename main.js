@@ -4,10 +4,11 @@ const canvas = document.querySelector("#canvas");
 const gl = canvas.getContext("webgl");
 var datInput = {
   renderSmoothen: 1000,
-  depth: -1.0,
+  depth: 3.0,
   Scale: 2.0,
   Power: 1.0,
   Offset: 1.0,
+  Rotation: 1.0,
 };
 var gui;
 function main() {
@@ -28,16 +29,16 @@ function main() {
     uniform float     depth;
     uniform float     Scale;
     uniform float     Power;
+    uniform float     Rotation;
     uniform float     Offset;
     uniform vec4      iMouse;
     precision highp float;
 
-    #define MAXSTEPS 25
-    #define z_near 10e-6
-    #define Iterations 30 
+    #define MAXSTEPS 15
+    #define z_near 10e-3
+    #define Iterations 10 
     // ########################### STRUCTS #############################
 
-    
     struct Ray {
       vec3 pos;
       vec3 dir;
@@ -46,15 +47,31 @@ function main() {
     // ########################## MAIN        ##########################
 
     float DE(vec3 z) {
+      // int n = 0;
+      // for (int i = 0; i < Iterations; i++) {
+      //   if(z.x+z.y<0.0) z.xy = -z.yx; // fold 1
+      //   if(z.x+z.z<0.0) z.xz = -z.zx; // fold 2
+      //   if(z.y+z.z<0.0) z.zy = -z.yz; // fold 3	
+      //   z = z*Scale - Offset*(Scale-1.0);
+      //   n++;
+      // }
+      // return (length(z) ) * pow(Scale, -float(n));
+      vec3 a1 = vec3(-1.0, 0, 0);
+      vec3 a2 = vec3( 1.0, 0, 0);
+      vec3 a3 = vec3( 0, 2.0, 0);
+      vec3 a4 = vec3(0, sqrt(2.0) / 2.0, 2.0);
+      vec3 c;
       int n = 0;
-      for (int i = 0; i < Iterations; i++) {
-        if(z.x+z.y<0.0) z.xy = -z.yx; // fold 1
-        if(z.x+z.z<0.0) z.xz = -z.zx; // fold 2
-        if(z.y+z.z<0.0) z.zy = -z.yz; // fold 3	
-        z = z*Scale - Offset*(Scale-1.0);
+      float dist, d;
+      for(int i = 0; i < Iterations; i++) {
+        c = a1; dist = length(z-a1);
+              d = length(z-a2); if (d < dist) { c = a2; dist=d; }
+        d = length(z-a3); if (d < dist) { c = a3; dist=d; }
+        d = length(z-a4); if (d < dist) { c = a4; dist=d; }
+        z = Scale*z-c*(Scale-1.0);
         n++;
       }
-      return (length(z) ) * pow(Scale, -float(n));
+      return length(z) * pow(Scale, float(-n));
     }
     
     vec3 ray_color(Ray r){
@@ -79,9 +96,12 @@ function main() {
       uv.x *= aspect_ratio;
       
       vec3 target = vec3(0.0);
-      vec3 origin = vec3(1.0, 1.0, 4.0);
+      vec3 origin = vec3(depth * sin(Rotation), 1.0, -depth * cos(Rotation));
+      vec3 dir = normalize(vec3(uv, 1.0));
 
-      Ray r = Ray(origin, normalize(vec3(uv, depth)) - target);
+      dir.xz *= mat2(cos(Rotation), -sin(Rotation), sin(Rotation), cos(Rotation));
+
+      Ray r = Ray(origin, dir);
       gl_FragColor = vec4(ray_color(r), 1.0);
     }
   `;
@@ -104,6 +124,7 @@ function main() {
   var scale = gl.getUniformLocation(program, "Scale");
   var power = gl.getUniformLocation(program, "Power");
   var offset = gl.getUniformLocation(program, "Offset");
+  var rotation = gl.getUniformLocation(program, "Rotation");
   var mouse = gl.getUniformLocation(program, "iMouse");
   function render(deltaMS) {
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -115,6 +136,7 @@ function main() {
     gl.uniform1f(scale, datInput.Scale);
     gl.uniform1f(power, datInput.Power);
     gl.uniform1f(offset, datInput.Offset);
+    gl.uniform1f(rotation, datInput.Rotation);
     gl.uniform4fv(mouse, [mousepos[0], mousepos[1], 0, 0]);
     gl.enableVertexAttribArray(positionAttributeLocation);
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -132,8 +154,9 @@ function initializeGUI() {
   var g = new dat.GUI({ name: "Controls" });
   var inputFolder = g.addFolder("Input");
   inputFolder.add(datInput, "renderSmoothen", 1, 1000);
-  inputFolder.add(datInput, "depth", -10, 0);
+  inputFolder.add(datInput, "depth", 0, 2.0 * Math.PI);
   inputFolder.add(datInput, "Scale", 0, 5);
   inputFolder.add(datInput, "Power", 0, 5);
   inputFolder.add(datInput, "Offset", 0, 5);
+  inputFolder.add(datInput, "Rotation", 0, 2.0 * Math.PI);
 }
