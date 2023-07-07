@@ -5,11 +5,11 @@ const gl = canvas.getContext("webgl");
 var datInput = {
   renderSmoothen: 1000,
   depth: 3.0,
-  Scale: 8.0,
+  Scale: -1.77,
   Power: 1.0,
   Offset: 1.0,
   Rotation: 1.0,
-  minRadius2: 1.0,
+  minRadius2: 0.25,
   fixedRadius2: 1.0,
   foldingLimit: 1.0,
 };
@@ -40,10 +40,10 @@ function main() {
     uniform vec4      iMouse;
     precision highp float;
 
-    #define MAXSTEPS 10
-    #define z_near 10e-4
+    #define MAXSTEPS 60
+    #define z_near 10e-6
     #define z_far 2.5
-    #define Iterations 10 
+    #define Iterations 20 
     // ########################### STRUCTS #############################
 
     
@@ -54,38 +54,50 @@ function main() {
 
     // ########################## MAIN        ##########################
 
-    void sphereFold(inout vec3 z, inout float dz) {
-      float r = length(z);
+    // simply scale the dual vectors
+void sphereFold(inout vec3 z, inout mat3 dz) {
 	float r2 = dot(z,z);
-	if (r<minRadius2) { 
+	if (r2 < minRadius2) {
 		float temp = (fixedRadius2/minRadius2);
-		z *= temp;
-		dz*= temp;
-	} else if (r2<fixedRadius2) { 
+		z*= temp; dz*=temp;
+	} else if (r2 < fixedRadius2) {
 		float temp =(fixedRadius2/r2);
-		z *= temp;
-		dz*= temp;
+                dz[0] =temp*(dz[0]-z*2.0*dot(z,dz[0])/r2);
+                dz[1] =temp*(dz[1]-z*2.0*dot(z,dz[1])/r2);
+                dz[2] =temp*(dz[2]-z*2.0*dot(z,dz[2])/r2);
+		z*=temp; dz*=temp;
 	}
 }
 
-void boxFold(inout vec3 z, inout float dz) {
+// reverse signs for dual vectors when folding
+void boxFold(inout vec3 z, inout mat3 dz) {
+	if (abs(z.x)>foldingLimit) { dz[0].x*=-1.0; dz[1].x*=-1.0; dz[2].x*=-1.0; }
+        if (abs(z.y)>foldingLimit)  { dz[0].y*=-1.0; dz[1].y*=-1.0; dz[2].y*=-1.0; }
+        if (abs(z.z)>foldingLimit)  { dz[0].z*=-1.0; dz[1].z*=-1.0; dz[2].z*=-1.0; }
 	z = clamp(z, -foldingLimit, foldingLimit) * 2.0 - z;
 }
 
-    float DE(vec3 pos) {
-vec3 z = pos;
-  	vec3 offset = z;
-	float dr = 1.0;
+float DE(vec3 z)
+{
+        // dz contains our three dual vectors,
+        // initialized to x,y,z directions.
+	mat3 dz = mat3(1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0);
+	
+	vec3 c = z;
+	mat3 dc = dz;
 	for (int n = 0; n < Iterations; n++) {
-		boxFold(z,dr);       // Reflect
-		sphereFold(z,dr);    // Sphere Inversion
- 		
-                z=Scale*z + offset;  // Scale & Translate
-                dr = dr*abs(Scale)+1.0;
+		boxFold(z,dz);
+		sphereFold(z,dz);
+		z*=Scale;
+		dz=mat3(dz[0]*Scale,dz[1]*Scale,dz[2]*Scale);
+		z += c*Offset;
+    mat3 offset_mat = mat3(vec3(1.0), vec3(1.0), vec3(1.0));
+    mat3 tmp = matrixCompMult(offset_mat,dc);
+    dz += tmp;
+		if (length(z)>1000.0) break;
 	}
-	float r = length(z);
-	return r/abs(dr);
-    }
+	return dot(z,z)/length(z*dz); 
+}
     
     vec3 ray_color(Ray r){
       float totalDistance = 0.0;
@@ -174,11 +186,11 @@ function initializeGUI() {
   var inputFolder = g.addFolder("Input");
   inputFolder.add(datInput, "renderSmoothen", 1, 1000);
   inputFolder.add(datInput, "depth", 0, 5);
-  inputFolder.add(datInput, "Scale", 8, 15);
+  inputFolder.add(datInput, "Scale", -10, 10);
   inputFolder.add(datInput, "Power", 0, 15);
   inputFolder.add(datInput, "Offset", 0, 5);
-  inputFolder.add(datInput, "foldingLimit", 0, 25);
+  inputFolder.add(datInput, "foldingLimit", 0, 2);
   inputFolder.add(datInput, "fixedRadius2", 0, 25);
-  inputFolder.add(datInput, "minRadius2", 0, 25);
+  inputFolder.add(datInput, "minRadius2", 0, 2);
   inputFolder.add(datInput, "Rotation", 0, 2.0 * Math.PI);
 }
